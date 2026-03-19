@@ -1,0 +1,109 @@
+{
+    "version": "1.0",
+    "name": "caloxi-backend",
+    "build": {
+        "type": "nixpacks",
+        "install_command": "npm install",
+        "build_command": "npm run build",
+        "start_command": "node dist/server.js"
+    },
+    "domains": {
+        "ports_exposes": "8000"
+    },
+    "environment_variables": {
+        "production": [
+            {
+                "key": "PORT",
+                "value": "8000"
+            },
+            {
+                "key": "HOST",
+                "value": "0.0.0.0"
+            },
+            {
+                "key": "NODE_ENV",
+                "value": "production"
+            },
+            {
+                "key": "API_PREFIX",
+                "value": "/api/v1"
+            },
+            {
+                "key": "MONGODB_URI",
+                "value": ""
+            },
+            {
+                "key": "REDIS_URL",
+                "value": ""
+            },
+            {
+                "key": "JWT_SECRET",
+                "value": "SERVICE_BASE64_64"
+            },
+            {
+                "key": "JWT_EXPIRES_IN",
+                "value": "2345m"
+            },
+            {
+                "key": "JWT_REFRESH_SECRET",
+                "value": "SERVICE_BASE64_64"
+            },
+            {
+                "key": "JWT_REFRESH_EXPIRES_IN",
+                "value": "7d"
+            },
+            {
+                "key": "ADMIN_JWT_SECRET",
+                "value": "SERVICE_BASE64_64"
+            },
+            {
+                "key": "GEMINI_API_KEY",
+                "value": ""
+            },
+            {
+                "key": "RESEND_API_KEY",
+                "value": ""
+            },
+            {
+                "key": "RESEND_FROM_EMAIL",
+                "value": "no-reply@caloxi.com"
+            },
+            {
+                "key": "RESEND_FROM_NAME",
+                "value": "Caloxi"
+            },
+            {
+                "key": "CLOUDINARY_CLOUD_NAME",
+                "value": ""
+            },
+            {
+                "key": "CLOUDINARY_API_KEY",
+                "value": ""
+            },
+            {
+                "key": "CLOUDINARY_API_SECRET",
+                "value": ""
+            },
+            {
+                "key": "RAZORPAY_KEY_ID",
+                "value": ""
+            },
+            {
+                "key": "RAZORPAY_KEY_SECRET",
+                "value": ""
+            },
+            {
+                "key": "RATE_LIMIT_MAX",
+                "value": "100"
+            },
+            {
+                "key": "RATE_LIMIT_WINDOW_MS",
+                "value": "60000"
+            },
+            {
+                "key": "ALLOWED_ORIGINS",
+                "value": "https://your-production-domain.com"
+            }
+        ]
+    }
+}
