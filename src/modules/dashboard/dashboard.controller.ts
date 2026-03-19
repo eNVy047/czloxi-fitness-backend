@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { DashboardService } from './dashboard.service';
 import { sendSuccess } from '../../utils/response';
 import { logger } from '../../utils/logger';
+import { z } from 'zod';
 
 export class DashboardController {
   static async getTodayLog(request: FastifyRequest, reply: FastifyReply) {
@@ -49,7 +50,8 @@ export class DashboardController {
   static async addWaterGlass(request: FastifyRequest, reply: FastifyReply) {
     try {
       const userId = (request.user as any).id;
-      const log = await DashboardService.addWaterGlass(userId);
+      const { date } = z.object({ date: z.string().optional() }).parse(request.body);
+      const log = await DashboardService.addWaterGlass(userId, date);
       return sendSuccess(reply, { log }, 'Water incremented successfully');
     } catch (error) {
       logger.error({ err: error, user: request.user }, 'Error PATCH dashboard/water');

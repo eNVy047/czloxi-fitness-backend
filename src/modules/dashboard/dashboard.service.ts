@@ -99,15 +99,18 @@ export class DashboardService {
    */
   static async getDayLog(userId: string, date: string): Promise<any> {
     const today = todayString();
+    
+    // Allow up to 1 day in the future to account for timezones
+    const serverTomorrow = format(new Date(Date.now() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
 
-    if (date > today) {
+    if (date > serverTomorrow) {
       throw new Error('Cannot fetch logs for future dates.');
     }
 
     let log: any = await DailyLog.findOne({ userId, date });
 
-    if (!log && date === today) {
-      log = await this.buildNewLog(userId, today);
+    if (!log && (date === today || date === serverTomorrow)) {
+      log = await this.buildNewLog(userId, date);
     }
 
     if (!log) {
@@ -233,8 +236,8 @@ export class DashboardService {
   /**
    * Increments the water glasses count for today.
    */
-  static async addWaterGlass(userId: string): Promise<IDailyLog> {
-    const log = await this.getOrCreateTodayLog(userId);
+  static async addWaterGlass(userId: string, date?: string): Promise<IDailyLog> {
+    const log = await this.getDayLog(userId, date || todayString());
     const before = log.waterGlasses;
     log.waterGlasses += 1;
     await log.save();

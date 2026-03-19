@@ -33,20 +33,21 @@ export class ActivityService {
     return log;
   }
 
-  static async updateSteps(userId: string, steps: number): Promise<IActivityLog> {
+  static async updateSteps(userId: string, steps: number, date?: string): Promise<IActivityLog> {
     const today = new Date().toISOString().split('T')[0];
+    const targetDate = date || today;
     
     // Calculate new values
     const stepCalories = Math.round(steps * 0.04);
     const distance = parseFloat((steps * 0.0008).toFixed(2)); // km
 
     const log = await ActivityLog.findOneAndUpdate(
-      { userId, date: today },
+      { userId, date: targetDate },
       { $set: { steps, stepCalories, distance } },
       { new: true, upsert: true }
     );
 
-    const syncedLog = await this.syncToDailyLog(userId, today);
+    const syncedLog = await this.syncToDailyLog(userId, targetDate);
     return syncedLog || log;
   }
 
@@ -57,8 +58,10 @@ export class ActivityService {
     reps?: number;
     isDaily?: boolean;
     days?: string[];
+    date?: string;
   }): Promise<IActivityLog> {
     const today = new Date().toISOString().split('T')[0];
+    const targetDate = exerciseData.date || today;
     
     // Get Exercise MET
     let selectedMet = 6; // Default MET if not found in library
@@ -75,7 +78,7 @@ export class ActivityService {
     const caloriesBurnt = Math.round(selectedMet * profile.weightKg * (exerciseData.duration / 60));
 
     const log = await ActivityLog.findOneAndUpdate(
-      { userId, date: today },
+      { userId, date: targetDate },
       {
         $push: {
           exercises: {
@@ -105,7 +108,7 @@ export class ActivityService {
       });
     }
 
-    const syncedLog = await this.syncToDailyLog(userId, today);
+    const syncedLog = await this.syncToDailyLog(userId, targetDate);
     return syncedLog || log;
   }
 
@@ -285,8 +288,9 @@ export class ActivityService {
     );
   }
 
-  static async workoutCheckin(userId: string, data: { done?: boolean, remindLater?: boolean }) {
+  static async workoutCheckin(userId: string, data: { done?: boolean, remindLater?: boolean, date?: string }) {
     const today = new Date().toISOString().split('T')[0];
+    const targetDate = data.date || today;
 
     // Upsert the daily log to avoid race conditions if the cron job or frontend hasn't created it yet
     const updatePayload: any = {};
@@ -295,7 +299,7 @@ export class ActivityService {
     }
 
     const log = await DailyLog.findOneAndUpdate(
-      { userId, date: today },
+      { userId, date: targetDate },
       { $set: updatePayload },
       { new: true, upsert: true } // Creates the skeleton if it doesn't exist at midnight
     );

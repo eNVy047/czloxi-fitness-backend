@@ -32,9 +32,12 @@ export class ActivityController {
   static async updateSteps(request: FastifyRequest, reply: FastifyReply) {
     try {
       const userId = (request.user as any).id;
-      const { steps } = z.object({ steps: z.number() }).parse(request.body);
+      const { steps, date } = z.object({ 
+        steps: z.number(),
+        date: z.string().optional()
+      }).parse(request.body);
       
-      const activity = await ActivityService.updateSteps(userId, steps);
+      const activity = await ActivityService.updateSteps(userId, steps, date);
       return sendSuccess(reply, activity, 'Steps updated successfully');
     } catch (error) {
       logger.error({ err: error, user: request.user }, 'Error PATCH activity/steps');
@@ -52,6 +55,7 @@ export class ActivityController {
         reps: z.number().optional(),
         isDaily: z.boolean().optional(),
         days: z.array(z.string()).optional(),
+        date: z.string().optional(),
       }).parse(request.body);
 
       const activity = await ActivityService.logExercise(userId, {
@@ -61,6 +65,7 @@ export class ActivityController {
         ...(exerciseData.reps !== undefined && { reps: exerciseData.reps }),
         ...(exerciseData.isDaily !== undefined && { isDaily: exerciseData.isDaily }),
         ...(exerciseData.days !== undefined && { days: exerciseData.days }),
+        ...(exerciseData.date !== undefined && { date: exerciseData.date }),
       });
       return sendSuccess(reply, activity, 'Exercise logged successfully');
     } catch (error) {
