@@ -20,6 +20,8 @@ export interface IUser extends Document {
   subscriptionEndDate?: Date;
   planType?: 'monthly' | 'yearly';
   paymentId?: string;
+  expoPushToken?: string;
+  lastActiveAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -53,6 +55,8 @@ const userSchema = new Schema<IUser>(
     subscriptionEndDate: { type: Date },
     planType: { type: String, enum: ['monthly', 'yearly'] },
     paymentId: { type: String },
+    expoPushToken: { type: String },
+    lastActiveAt: { type: Date, default: Date.now },
   },
   {
     timestamps: true,

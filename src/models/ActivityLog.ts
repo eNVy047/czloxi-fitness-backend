@@ -17,6 +17,7 @@ export interface IActivityLog extends Document {
     reps?: number;
     caloriesBurnt: number;
     isRoutine?: boolean;
+    fromRoutine?: boolean;
   }[];
   sleepHours?: number;
   sleepScore?: number;
@@ -35,6 +36,7 @@ const exerciseSchema = new Schema({
   reps: { type: Number },
   caloriesBurnt: { type: Number, required: true },
   isRoutine: { type: Boolean, default: false },
+  fromRoutine: { type: Boolean, default: false },
 });
 
 const activityLogSchema = new Schema<IActivityLog>(

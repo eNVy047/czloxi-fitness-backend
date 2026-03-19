@@ -8,10 +8,23 @@ export class ActivityController {
   static async getTodayActivity(request: FastifyRequest, reply: FastifyReply) {
     try {
       const userId = (request.user as any).id;
-      const activity = await ActivityService.getOrCreateTodayActivity(userId);
-      return sendSuccess(reply, activity, 'Today activity fetched successfully');
+      const date = (request.query as any).date;
+      const activity = await ActivityService.getOrCreateTodayActivity(userId, date);
+      return sendSuccess(reply, activity, 'Activity fetched successfully');
     } catch (error) {
       logger.error({ err: error, user: request.user }, 'Error GET activity/today');
+      throw error;
+    }
+  }
+
+  static async getActivityLog(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request.user as any).id;
+      const { date } = z.object({ date: z.string().optional() }).parse(request.query);
+      const log = await ActivityService.getActivityLog(userId, date || new Date().toISOString().split('T')[0]);
+      return sendSuccess(reply, log || { exercises: [], steps: 0, totalCaloriesBurnt: 0 }, 'Activity log fetched successfully');
+    } catch (error) {
+      logger.error({ err: error, user: request.user }, 'Error GET activity/log');
       throw error;
     }
   }

@@ -7,6 +7,7 @@ export default async function activityRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', subscriptionGuard);
 
   fastify.get('/today', ActivityController.getTodayActivity);
+  fastify.get('/log', ActivityController.getActivityLog);
   fastify.patch('/steps', ActivityController.updateSteps);
   fastify.post('/exercise', ActivityController.logExercise);
   fastify.delete('/exercise/:id', ActivityController.deleteExercise);

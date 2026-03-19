@@ -4,6 +4,7 @@ import { ProfileService } from '../profile/profile.service';
 import { NotFoundError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { NotificationService } from '../notifications/notification.service';
 
 function todayString(): string {
   return format(new Date(), 'yyyy-MM-dd');
@@ -234,8 +235,19 @@ export class DashboardService {
    */
   static async addWaterGlass(userId: string): Promise<IDailyLog> {
     const log = await this.getOrCreateTodayLog(userId);
+    const before = log.waterGlasses;
     log.waterGlasses += 1;
     await log.save();
+    
+    if (log.waterGoal > 0 && before < log.waterGoal && log.waterGlasses >= log.waterGoal) {
+      await NotificationService.sendPushNotification(
+        userId, 
+        "Hydration Goal Met! 💧", 
+        `Great job drinking ${log.waterGoal} glasses of water today!`, 
+        { type: 'achievement' }
+      );
+    }
+    
     return log;
   }
 }

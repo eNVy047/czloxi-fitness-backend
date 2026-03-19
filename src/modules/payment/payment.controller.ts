@@ -30,7 +30,7 @@ export class PaymentController {
       const { id: userId } = request.user as { id: string };
       const { planType } = createOrderSchema.parse(request.body);
 
-      const amount = planType === 'monthly' ? 9900 : 99900; // ₹99 or ₹999 in paise
+      const amount = planType === 'monthly' ? 100 : 99900; // ₹99 or ₹999 in paise
       const currency = 'INR';
 
       const options = {
@@ -67,11 +67,11 @@ export class PaymentController {
   static async verifyPayment(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id: userId } = request.user as { id: string };
-      const { 
-        razorpay_order_id, 
-        razorpay_payment_id, 
+      const {
+        razorpay_order_id,
+        razorpay_payment_id,
         razorpay_signature,
-        planType 
+        planType
       } = verifyPaymentSchema.parse(request.body);
 
       const generated_signature = crypto
@@ -121,7 +121,7 @@ export class PaymentController {
     try {
       const { id: userId } = request.user as { id: string };
       const user = await User.findById(userId).select('subscriptionStatus subscriptionEndDate trialEndsAt');
-      
+
       if (!user) {
         return sendError(reply, 404, 'User not found');
       }
@@ -170,9 +170,9 @@ export class PaymentController {
       user.trialEndsAt = trialEndsAt;
       await user.save();
 
-      return sendSuccess(reply, { 
+      return sendSuccess(reply, {
         subscriptionStatus: user.subscriptionStatus,
-        trialEndsAt: user.trialEndsAt 
+        trialEndsAt: user.trialEndsAt
       }, 'Free trial started');
     } catch (error) {
       logger.error({ err: error }, 'Error in PaymentController.startTrial');

@@ -8,14 +8,19 @@ import { NotificationService } from '../notifications/notification.service';
 import { logger } from '../../utils/logger';
 
 export class ActivityService {
-  static async getOrCreateTodayActivity(userId: string): Promise<IActivityLog> {
+  static async getOrCreateTodayActivity(userId: string, targetDate?: string): Promise<IActivityLog> {
     const today = new Date().toISOString().split('T')[0];
-    let log = await ActivityLog.findOne({ userId, date: today });
+    const fetchDate = targetDate || today;
+    let log = await ActivityLog.findOne({ userId, date: fetchDate });
+
+    if (!log && fetchDate === today) {
+      return this.createTodayLog(userId);
+    }
 
     if (!log) {
       log = await ActivityLog.create({
         userId,
-        date: today,
+        date: fetchDate,
         steps: 0,
         stepCalories: 0,
         totalCaloriesBurnt: 0,
@@ -125,6 +130,85 @@ export class ActivityService {
     return ExerciseLibrary.find().sort({ name: 1 });
   }
 
+  static async createTodayLog(userId: string): Promise<IActivityLog> {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const todayDay = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
+
+    // 1. Get active routines for today
+    const routines = await ExerciseRoutine.find({ userId, isActive: true, days: todayDay });
+    const profile = await UserProfile.findOne({ userId });
+    
+    const exercises = [];
+    let routineCalories = 0;
+
+    if (profile && routines.length > 0) {
+      for (const r of routines) {
+        const caloriesBurnt = Math.round(r.met * profile.weightKg * (r.duration / 60));
+        exercises.push({
+          name: r.exerciseName,
+          met: r.met,
+          duration: r.duration,
+          sets: r.sets,
+          reps: r.reps,
+          caloriesBurnt,
+          isRoutine: true,
+          fromRoutine: true,
+        });
+        routineCalories += caloriesBurnt;
+      }
+    }
+
+    // 2. Sleep schedule
+    const sleep = await SleepSchedule.findOne({ userId, isDaily: true });
+    let sleepData: any = {};
+    if (sleep) {
+      const [bH, bM] = sleep.defaultBedtime.split(':').map(Number);
+      const [wH, wM] = sleep.defaultWakeTime.split(':').map(Number);
+      let diff = wH - bH + (wM - bM) / 60;
+      if (diff < 0) diff += 24;
+      sleepData = {
+        bedtime: sleep.defaultBedtime,
+        wakeTime: sleep.defaultWakeTime,
+        sleepHours: parseFloat(diff.toFixed(1)),
+      };
+    }
+
+    // 3. Create Log
+    const log = await ActivityLog.create({
+      userId,
+      date: dateStr,
+      exercises,
+      totalCaloriesBurnt: routineCalories,
+      ...sleepData
+    });
+
+    // 4. Sync to DailyLog
+    await DailyLog.findOneAndUpdate(
+      { userId, date: dateStr },
+      { 
+        $set: { 
+          caloriesBurnt: routineCalories,
+          ...(sleepData.sleepHours ? { sleepHours: sleepData.sleepHours } : {})
+        } 
+      },
+      { upsert: true }
+    );
+
+    return log;
+  }
+
+  static async getActivityLog(userId: string, date: string): Promise<IActivityLog | null> {
+    const today = new Date().toISOString().split('T')[0];
+    let log = await ActivityLog.findOne({ userId, date });
+    
+    if (!log && date === today) {
+      return this.createTodayLog(userId);
+    }
+    
+    return log;
+  }
+
   // --- Sleep Methods ---
 
   static async logSleep(userId: string, date: string, data: {
@@ -176,10 +260,12 @@ export class ActivityService {
   static async getRoutine(userId: string) {
     const sleepSchedule = await SleepSchedule.findOne({ userId });
     const exerciseRoutines = await ExerciseRoutine.find({ userId, isActive: true });
+    const profile = await UserProfile.findOne({ userId });
     
     return {
       sleepSchedule,
       exerciseRoutines,
+      userWeight: profile?.weightKg || 70,
     };
   }
 
@@ -268,12 +354,13 @@ export class ActivityService {
               reps: r.reps,
               caloriesBurnt,
               isRoutine: true,
+              fromRoutine: true,
             };
           })
           .filter(ex => {
             if (!existingActivity) return true;
             return !existingActivity.exercises.some((e: any) =>
-              e.isRoutine === true &&
+              e.fromRoutine === true &&
               e.name === ex.name &&
               e.duration === ex.duration &&
               (e.sets || null) === (ex.sets || null) &&
@@ -357,12 +444,35 @@ export class ActivityService {
       activity.totalCaloriesBurnt = totalBurnt;
       await activity.save();
 
+      // Check for step goal achievement before updating
+      const dailyLog = await DailyLog.findOne({ userId, date });
+      let stepGoalJustMet = false;
+      if (dailyLog && dailyLog.stepGoal > 0) {
+        if (dailyLog.steps < dailyLog.stepGoal && activity.steps >= dailyLog.stepGoal) {
+          stepGoalJustMet = true;
+        }
+      }
+
       // Sync to DailyLog
       await DailyLog.findOneAndUpdate(
         { userId, date },
-        { $set: { caloriesBurnt: totalBurnt } },
+        { 
+          $set: { 
+            caloriesBurnt: totalBurnt,
+            steps: activity.steps 
+          } 
+        },
         { upsert: true }
       );
+      
+      if (stepGoalJustMet) {
+        await NotificationService.sendPushNotification(
+          userId, 
+          "Step Goal Achieved! 🏃‍♂️", 
+          `Awesome job hitting your ${dailyLog?.stepGoal} steps today!`, 
+          { type: 'achievement' }
+        );
+      }
       
       return activity;
     } catch (error) {
