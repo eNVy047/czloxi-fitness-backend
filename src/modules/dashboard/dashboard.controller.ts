@@ -5,6 +5,17 @@ import { logger } from '../../utils/logger';
 import { z } from 'zod';
 
 export class DashboardController {
+  static async getOverview(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request.user as any).id;
+      const data = await DashboardService.getOverview(userId);
+      return sendSuccess(reply, data, 'Overview data fetched successfully');
+    } catch (error) {
+      logger.error({ err: error, user: request.user }, 'Error GET dashboard/overview');
+      throw error;
+    }
+  }
+
   static async getTodayLog(request: FastifyRequest, reply: FastifyReply) {
     try {
       const userId = (request.user as any).id;

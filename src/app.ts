@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
+import compress from '@fastify/compress';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler } from './utils/errors';
@@ -18,6 +19,7 @@ import activityRoutes from './modules/activity/activity.routes';
 import notificationRoutes from './modules/notifications/notification.routes';
 import progressRoutes from './modules/progress/progress.routes';
 import paymentRoutes from './modules/payment/payment.routes';
+import userRoutes from './modules/profile/user.routes';
 import cron from 'node-cron';
 import { User } from './models/User';
 import { FoodScan } from './models/FoodScan';
@@ -44,6 +46,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       fileSize: 10 * 1024 * 1024, // 10MB
     },
   });
+  await app.register(compress);
 
   // Custom Plugins
   await app.register(authPlugin);
@@ -64,6 +67,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(notificationRoutes, { prefix: `${env.API_PREFIX}/notifications` });
   await app.register(progressRoutes, { prefix: `${env.API_PREFIX}/progress` });
   await app.register(paymentRoutes, { prefix: `${env.API_PREFIX}/payment` });
+  await app.register(userRoutes, { prefix: `${env.API_PREFIX}/user` });
   
   // Isolated Admin Routes
   const adminRoutes = (await import('./admin/admin.routes')).default;
@@ -120,7 +124,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       const now = new Date();
       const expiredUsers = await User.find({ 
         subscriptionStatus: 'trial', 
-        trialEndsAt: { $lt: now } 
+        trialEndsAt: { $lt: now },
+        fcmToken: { $exists: true, $nin: [null, ''] }
       });
       
       if (expiredUsers.length > 0) {
@@ -154,7 +159,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       const { NotificationService } = await import('./modules/notifications/notification.service');
       
       const today = new Date().toISOString().split('T')[0];
-      const users = await User.find({ expoPushToken: { $exists: true, $ne: '' } });
+      const users = await User.find({ fcmToken: { $exists: true, $nin: [null, ''] } });
       
       for (const user of users) {
         const log = await ActivityLog.findOne({ userId: user._id, date: today });
@@ -182,7 +187,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       const now = new Date();
       const expiredUsers = await User.find({ 
         subscriptionStatus: 'active', 
-        subscriptionEndDate: { $lt: now } 
+        subscriptionEndDate: { $lt: now },
+        fcmToken: { $exists: true, $nin: [null, ''] }
       });
       
       if (expiredUsers.length > 0) {

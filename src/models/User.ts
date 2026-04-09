@@ -21,6 +21,7 @@ export interface IUser extends Document {
   planType?: 'monthly' | 'yearly';
   paymentId?: string;
   expoPushToken?: string;
+  fcmToken?: string;
   lastActiveAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +57,7 @@ const userSchema = new Schema<IUser>(
     planType: { type: String, enum: ['monthly', 'yearly'] },
     paymentId: { type: String },
     expoPushToken: { type: String },
+    fcmToken: { type: String },
     lastActiveAt: { type: Date, default: Date.now },
   },
   {

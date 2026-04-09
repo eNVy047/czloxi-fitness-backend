@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { registerSchema, RegisterInput, loginSchema, LoginInput } from './auth.schema';
+import { registerSchema, RegisterInput, loginSchema, LoginInput, forgotPasswordSchema, ForgotPasswordInput } from './auth.schema';
 import { AuthService } from './auth.service';
 import { sendCreated, sendSuccess } from '../../utils/response';
 import { logger } from '../../utils/logger';
@@ -40,13 +40,9 @@ export class AuthController {
 
   static async login(request: FastifyRequest, reply: FastifyReply) {
     try {
-      console.log('--- LOGIN REQUEST STARTED ---');
-      console.log('Request body:', request.body);
       const data: LoginInput = loginSchema.parse(request.body);
       
-      console.log('Input validated:', data.email);
       const user = await AuthService.loginUser(data);
-      console.log('User fetched and password matched! User ID:', user._id);
 
       const token = await reply.jwtSign({
         id: user._id.toString(),
@@ -54,7 +50,6 @@ export class AuthController {
         subscriptionTier: user.subscriptionTier,
         subscriptionStatus: user.subscriptionStatus,
       });
-      console.log('JWT Token generated.');
 
       const userData = {
         id: user._id,
@@ -65,10 +60,8 @@ export class AuthController {
         subscriptionEndDate: user.subscriptionEndDate,
       };
 
-      console.log('Sending successful response.');
       return reply.send({ success: true, message: 'Login successful', data: { user: userData, token } });
     } catch (error) {
-      console.error('--- LOGIN ERROR CAUGHT ---', error);
       logger.error({ err: error }, 'Error in AuthController.login');
       throw error;
     }
@@ -95,6 +88,26 @@ export class AuthController {
       return sendSuccess(reply, { user: jwtUser }, 'Token is valid');
     } catch (error) {
       logger.error({ err: error }, 'Error in AuthController.verifyToken');
+      throw error;
+    }
+  }
+ 
+  static async forgotPassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { email }: ForgotPasswordInput = forgotPasswordSchema.parse(request.body);
+      
+      await AuthService.forgotPassword(email);
+ 
+      return sendSuccess(reply, null, 'If your email is registered, we have sent you a temporary password.');
+    } catch (error: any) {
+      // For security, don't reveal if user exists or not if we want to be more paranoid
+      // For now, if user not found, 404 is thrown by service. 
+      // We can catch it and return 200 anyway if we want total privacy.
+      if (error.name === 'NotFoundError') {
+        return sendSuccess(reply, null, 'If your email is registered, we have sent you a temporary password.');
+      }
+      
+      logger.error({ err: error }, 'Error in AuthController.forgotPassword');
       throw error;
     }
   }

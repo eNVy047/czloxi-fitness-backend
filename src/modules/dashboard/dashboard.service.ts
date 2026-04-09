@@ -12,6 +12,31 @@ function todayString(): string {
 
 export class DashboardService {
   /**
+   * Get combined goals and today's stats for the global overview.
+   */
+  static async getOverview(userId: string): Promise<any> {
+    const profile = await UserProfile.findOne({ userId });
+    if (!profile) {
+      throw new NotFoundError('User profile not found. Please complete profile setup.');
+    }
+
+    const log = await this.getOrCreateTodayLog(userId);
+
+    return {
+      goals: profile.goals || {},
+      consumed: {
+        caloriesConsumed: log.caloriesConsumed || 0,
+        proteinConsumed: log.proteinConsumed || 0,
+        carbsConsumed: log.carbsConsumed || 0,
+        fatConsumed: log.fatConsumed || 0,
+        waterConsumed: log.waterGlasses || 0,
+        stepsTaken: log.steps || 0,
+        caloriesBurnt: log.caloriesBurnt || 0,
+      }
+    };
+  }
+
+  /**
    * Build a fresh DailyLog document for a specific date using the user's current profile goals.
    */
   private static async buildNewLog(userId: string, date: string): Promise<IDailyLog> {

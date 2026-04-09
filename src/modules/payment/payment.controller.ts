@@ -30,7 +30,7 @@ export class PaymentController {
       const { id: userId } = request.user as { id: string };
       const { planType } = createOrderSchema.parse(request.body);
 
-      const amount = planType === 'monthly' ? 9900 : 99900; // ₹99 or ₹999 in paise
+      const amount = planType === 'monthly' ? 2900 : 29900; // ₹99 or ₹999 in paise
       const currency = 'INR';
 
       const options = {

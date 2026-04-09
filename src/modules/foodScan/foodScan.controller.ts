@@ -36,16 +36,37 @@ export class FoodScanController {
       }
       Do not wrap the JSON in markdown code blocks or any other characters. Just return the raw JSON string.`;
 
-      const imageParts = [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: 'image/jpeg', // Defaulting to jpeg, frontend should send correctly formatted base64
-          },
+      const imageParts = [{
+        inlineData: {
+          data: base64Data,
+          mimeType: 'image/jpeg',
         },
-      ];
+      }];
 
-      const result = await model.generateContent([prompt, ...imageParts]);
+      let result;
+      let lastError: any;
+      const maxRetries = 3;
+      
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          result = await model.generateContent([prompt, ...imageParts]);
+          break;
+        } catch (error: any) {
+          lastError = error;
+          const isRetryable = error.status === 503 || error.status === 429 || error.message?.includes('503') || error.message?.includes('429');
+          
+          if (isRetryable && i < maxRetries - 1) {
+            const delay = Math.pow(2, i) * 1000;
+            logger.warn(`Gemini API 503/429, retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (!result) throw lastError;
+
       const response = await result.response;
       let text = response.text().trim();
 
