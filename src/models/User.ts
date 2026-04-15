@@ -20,6 +20,9 @@ export interface IUser extends Document {
   subscriptionEndDate?: Date;
   planType?: 'monthly' | 'yearly';
   paymentId?: string;
+  trialUsed: boolean;
+  scansToday: number;
+  lastScanDate?: string;
   expoPushToken?: string;
   fcmToken?: string;
   lastActiveAt?: Date;
@@ -56,8 +59,11 @@ const userSchema = new Schema<IUser>(
     subscriptionEndDate: { type: Date },
     planType: { type: String, enum: ['monthly', 'yearly'] },
     paymentId: { type: String },
+    trialUsed: { type: Boolean, default: false },
+    scansToday: { type: Number, default: 0 },
+    lastScanDate: { type: String },
     expoPushToken: { type: String },
-    fcmToken: { type: String },
+    fcmToken: { type: String, index: true },
     lastActiveAt: { type: Date, default: Date.now },
   },
   {

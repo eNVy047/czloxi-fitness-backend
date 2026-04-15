@@ -7,6 +7,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.post('/admin/login', adminController.adminLogin);
   
   // Protected Admin Routes
+  app.get('/admin/users', { preHandler: [authMiddleware] }, adminController.getUsers as any);
   app.post('/admin/notifications/send', { preHandler: [authMiddleware] }, adminController.sendNotification as any);
   app.post('/admin/notifications/schedule', { preHandler: [authMiddleware] }, adminController.scheduleNotification as any);
   app.get('/admin/notifications/history', { preHandler: [authMiddleware] }, adminController.getHistory as any);

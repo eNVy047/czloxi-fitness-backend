@@ -157,8 +157,8 @@ export class PaymentController {
         return sendError(reply, 404, 'User not found');
       }
 
-      if (user.subscriptionStatus !== 'none' || user.trialStartDate) {
-        return sendError(reply, 400, 'Trial already started or user already subscribed');
+      if (user.subscriptionStatus !== 'none' || user.trialUsed) {
+        return sendError(reply, 400, 'Trial has already been used or user is already subscribed');
       }
 
       const now = new Date();
@@ -166,8 +166,10 @@ export class PaymentController {
       trialEndsAt.setDate(now.getDate() + 7);
 
       user.subscriptionStatus = 'trial';
+      user.subscriptionTier = 'pro';
       user.trialStartDate = now;
       user.trialEndsAt = trialEndsAt;
+      user.trialUsed = true;
       await user.save();
 
       return sendSuccess(reply, {

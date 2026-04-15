@@ -4,7 +4,7 @@ import { env } from './env';
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
 export const geminiFlash = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
+  model: 'gemini-flash-latest',
   safetySettings: [
     {
       category: HarmCategory.HARM_CATEGORY_HARASSMENT,

@@ -135,4 +135,49 @@ export class ProfileController {
       throw error;
     }
   }
+
+  /**
+   * Save FCM token to user profile
+   */
+  static async saveFcmToken(request: FastifyRequest<{ Body: { fcmToken: string } }>, reply: FastifyReply) {
+    try {
+      const { fcmToken } = request.body;
+      const userId = (request.user as any).id;
+
+      if (!fcmToken) {
+        return reply.status(400).send({ success: false, message: 'fcmToken is required' });
+      }
+
+      // 1. Remove this fcmToken from ALL other users
+      await User.updateMany(
+        { fcmToken, _id: { $ne: userId } },
+        { $unset: { fcmToken: "" } }
+      );
+      
+      // 2. Save to current user
+      await User.findByIdAndUpdate(userId, { 
+        fcmToken,
+        expoPushToken: fcmToken 
+      });
+
+      return sendSuccess(reply, null, 'FCM token saved successfully');
+    } catch (error) {
+      logger.error({ err: error }, 'Error saving FCM token');
+      throw error;
+    }
+  }
+
+  /**
+   * Remove FCM token on logout
+   */
+  static async removeFcmToken(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request.user as any).id;
+      await User.findByIdAndUpdate(userId, { $unset: { fcmToken: "", expoPushToken: "" } });
+      return sendSuccess(reply, null, 'FCM token removed successfully');
+    } catch (error) {
+      logger.error({ err: error }, 'Error removing FCM token');
+      throw error;
+    }
+  }
 }

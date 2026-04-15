@@ -5,6 +5,8 @@ import { ExerciseRoutine } from '../../models/ExerciseRoutine';
 import { SleepSchedule } from '../../models/SleepSchedule';
 import { UserProfile } from '../../models/UserProfile';
 import { NotificationService } from '../notifications/notification.service';
+import { StepRecord } from '../../models/StepRecord';
+import { startOfDay, endOfDay, format } from 'date-fns';
 import { logger } from '../../utils/logger';
 
 export class ActivityService {
@@ -36,7 +38,7 @@ export class ActivityService {
   static async updateSteps(userId: string, steps: number, date?: string): Promise<IActivityLog> {
     const today = new Date().toISOString().split('T')[0];
     const targetDate = date || today;
-    
+
     // Calculate new values
     const stepCalories = Math.round(steps * 0.04);
     const distance = parseFloat((steps * 0.0008).toFixed(2)); // km
@@ -62,7 +64,7 @@ export class ActivityService {
   }): Promise<IActivityLog> {
     const today = new Date().toISOString().split('T')[0];
     const targetDate = exerciseData.date || today;
-    
+
     // Get Exercise MET
     let selectedMet = 6; // Default MET if not found in library
     const exercise = await ExerciseLibrary.findOne({ name: exerciseData.exerciseName });
@@ -114,7 +116,7 @@ export class ActivityService {
 
   static async deleteExercise(userId: string, exerciseId: string): Promise<IActivityLog | null> {
     const today = new Date().toISOString().split('T')[0];
-    
+
     const log = await ActivityLog.findOneAndUpdate(
       { userId, date: today },
       { $pull: { exercises: { _id: exerciseId } } },
@@ -125,7 +127,7 @@ export class ActivityService {
       const syncedLog = await this.syncToDailyLog(userId, today);
       return syncedLog || log;
     }
-    
+
     return log;
   }
 
@@ -141,7 +143,7 @@ export class ActivityService {
     // 1. Get active routines for today
     const routines = await ExerciseRoutine.find({ userId, isActive: true, days: todayDay });
     const profile = await UserProfile.findOne({ userId });
-    
+
     const exercises = [];
     let routineCalories = 0;
 
@@ -189,11 +191,11 @@ export class ActivityService {
     // 4. Sync to DailyLog
     await DailyLog.findOneAndUpdate(
       { userId, date: dateStr },
-      { 
-        $set: { 
+      {
+        $set: {
           caloriesBurnt: routineCalories,
           ...(sleepData.sleepHours ? { sleepHours: sleepData.sleepHours } : {})
-        } 
+        }
       },
       { upsert: true }
     );
@@ -204,11 +206,11 @@ export class ActivityService {
   static async getActivityLog(userId: string, date: string): Promise<IActivityLog | null> {
     const today = new Date().toISOString().split('T')[0];
     let log = await ActivityLog.findOne({ userId, date });
-    
+
     if (!log && date === today) {
       return this.createTodayLog(userId);
     }
-    
+
     return log;
   }
 
@@ -264,7 +266,7 @@ export class ActivityService {
     const sleepSchedule = await SleepSchedule.findOne({ userId });
     const exerciseRoutines = await ExerciseRoutine.find({ userId, isActive: true });
     const profile = await UserProfile.findOne({ userId });
-    
+
     return {
       sleepSchedule,
       exerciseRoutines,
@@ -306,7 +308,7 @@ export class ActivityService {
 
     // Call notification service if they selected `remindLater`
     if (data.remindLater) {
-        await NotificationService.rescheduleCheckIn(userId);
+      await NotificationService.rescheduleCheckIn(userId);
     }
 
     return { success: true, log };
@@ -328,7 +330,7 @@ export class ActivityService {
 
       // 1. Get all routines for today
       const todayRoutines = await ExerciseRoutine.find({ isActive: true, days: todayDay });
-      
+
       // Group by user
       const userRoutines: Record<string, any[]> = {};
       for (const r of todayRoutines) {
@@ -379,15 +381,15 @@ export class ActivityService {
 
         // 3. Get sleep schedule if any
         const sleep = await SleepSchedule.findOne({ userId, isDaily: true });
-        
+
         let sleepHours = 0;
         if (sleep) {
-           // Basic hour calc: split HH:mm
-           const [bH, bM] = sleep.defaultBedtime.split(':').map(Number);
-           const [wH, wM] = sleep.defaultWakeTime.split(':').map(Number);
-           let diff = wH - bH + (wM - bM) / 60;
-           if (diff < 0) diff += 24;
-           sleepHours = parseFloat(diff.toFixed(1));
+          // Basic hour calc: split HH:mm
+          const [bH, bM] = sleep.defaultBedtime.split(':').map(Number);
+          const [wH, wM] = sleep.defaultWakeTime.split(':').map(Number);
+          let diff = wH - bH + (wM - bM) / 60;
+          if (diff < 0) diff += 24;
+          sleepHours = parseFloat(diff.toFixed(1));
         }
 
         // 4. Create or update ActivityLog and DailyLog
@@ -397,12 +399,12 @@ export class ActivityService {
             ...(newExercises.length > 0 ? { $push: { exercises: { $each: newExercises } } } : {}),
             ...(sleep
               ? {
-                  $set: {
-                    bedtime: sleep.defaultBedtime,
-                    wakeTime: sleep.defaultWakeTime,
-                    sleepHours,
-                  },
-                }
+                $set: {
+                  bedtime: sleep.defaultBedtime,
+                  wakeTime: sleep.defaultWakeTime,
+                  sleepHours,
+                },
+              }
               : {}),
           },
           { new: true, upsert: true }
@@ -417,11 +419,11 @@ export class ActivityService {
 
           await DailyLog.findOneAndUpdate(
             { userId, date: dateStr },
-            { 
-              $set: { 
+            {
+              $set: {
                 caloriesBurnt: totalBurnt,
                 ...(sleep ? { sleepHours } : {})
-              } 
+              }
             },
             { upsert: true }
           );
@@ -432,6 +434,42 @@ export class ActivityService {
     } catch (error) {
       logger.error({ err: error }, 'Error applying daily routines');
     }
+  }
+
+  // --- Batch Step Methods ---
+
+  static async getLastStepRecord(userId: string) {
+    return StepRecord.findOne({ userId }).sort({ timestamp: -1 });
+  }
+
+  static async syncBatchSteps(userId: string, steps: number, timestamp: string): Promise<any> {
+    const ts = new Date(timestamp);
+    const dateStr = ts.toISOString().split('T')[0];
+
+    // 1. Log the time-series record
+    await StepRecord.create({
+      userId,
+      steps,
+      timestamp: ts,
+    });
+
+    // 2. Update the daily aggregate
+    // Note: We increment steps in ActivityLog
+    const log = await ActivityLog.findOneAndUpdate(
+      { userId, date: dateStr },
+      { $inc: { steps } },
+      { new: true, upsert: true }
+    );
+
+    // Recalculate calories and distance for the day
+    if (log) {
+      log.stepCalories = Math.round(log.steps * 0.04);
+      log.distance = parseFloat((log.steps * 0.0008).toFixed(2));
+      await log.save();
+      await this.syncToDailyLog(userId, dateStr);
+    }
+
+    return log;
   }
 
   // --- Private Sync ---
@@ -460,24 +498,24 @@ export class ActivityService {
       // Sync to DailyLog
       await DailyLog.findOneAndUpdate(
         { userId, date },
-        { 
-          $set: { 
+        {
+          $set: {
             caloriesBurnt: totalBurnt,
-            steps: activity.steps 
-          } 
+            steps: activity.steps
+          }
         },
         { upsert: true }
       );
-      
+
       if (stepGoalJustMet) {
         await NotificationService.sendPushNotification(
-          userId, 
-          "Step Goal Achieved! 🏃‍♂️", 
-          `Awesome job hitting your ${dailyLog?.stepGoal} steps today!`, 
+          userId,
+          "Step Goal Achieved! 🏃‍♂️",
+          `Awesome job hitting your ${dailyLog?.stepGoal} steps today!`,
           { type: 'achievement' }
         );
       }
-      
+
       return activity;
     } catch (error) {
       logger.error({ err: error, userId, date }, 'Failed to sync Activity to DailyLog');

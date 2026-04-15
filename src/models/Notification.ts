@@ -2,7 +2,6 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INotification extends Document {
   userId?: mongoose.Types.ObjectId; // Optional for bulk notifications
-  type: 'meal' | 'water' | 'activity' | 'sleep' | 'streak' | 'subscription' | 'admin' | 'achievement' | 'report' | 'reminder' | 'promo' | 'general';
   title: string;
   message: string;
   isRead: boolean;
@@ -32,11 +31,6 @@ export interface INotification extends Document {
 const NotificationSchema: Schema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
-    type: { 
-      type: String, 
-      enum: ['meal', 'water', 'activity', 'sleep', 'streak', 'subscription', 'admin', 'achievement', 'report', 'reminder', 'promo', 'general'], 
-      required: true 
-    },
     title: { type: String, required: true },
     message: { type: String, required: true },
     isRead: { type: Boolean, default: false },

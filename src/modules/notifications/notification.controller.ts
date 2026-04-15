@@ -37,7 +37,6 @@ export const getUnreadCount = async (request: FastifyRequest, reply: FastifyRepl
 export interface SendNotificationBody {
   title: string;
   message: string;
-  type?: string;
   targetType: 'all' | 'selected' | 'filter';
   targetUserIds?: string[];
   targetFilter?: {
@@ -54,19 +53,21 @@ export interface ScheduleNotificationBody extends SendNotificationBody {
 export interface NotificationHistoryQuery {
   page?: number;
   limit?: number;
-  type?: string;
   status?: string;
 }
 
 // Admin: Send Notification Now
 export const sendAdminNotification = async (request: FastifyRequest<{ Body: SendNotificationBody }>, reply: FastifyReply) => {
   try {
-    const { title, message, type, targetType, targetUserIds, targetFilter } = request.body;
+    const { title, message, targetType, targetUserIds, targetFilter } = request.body;
     
+    if (!title || !message) {
+      return reply.status(400).send({ success: false, message: 'Notification title and message are required' });
+    }
+
     const notification = await Notification.create({
       title,
       message,
-      type: type || 'general',
       targetType,
       targetUserIds,
       targetFilter,
@@ -89,12 +90,15 @@ export const sendAdminNotification = async (request: FastifyRequest<{ Body: Send
 // Admin: Schedule Notification
 export const scheduleAdminNotification = async (request: FastifyRequest<{ Body: ScheduleNotificationBody }>, reply: FastifyReply) => {
   try {
-    const { title, message, type, targetType, targetUserIds, targetFilter, scheduledAt } = request.body;
+    const { title, message, targetType, targetUserIds, targetFilter, scheduledAt } = request.body;
     
+    if (!title || !message) {
+      return reply.status(400).send({ success: false, message: 'Notification title and message are required' });
+    }
+
     const notification = await Notification.create({
       title,
       message,
-      type: type || 'general',
       targetType,
       targetUserIds,
       targetFilter,
@@ -113,10 +117,9 @@ export const scheduleAdminNotification = async (request: FastifyRequest<{ Body: 
 // Admin: Get Notification History
 export const getAdminNotificationHistory = async (request: FastifyRequest<{ Querystring: NotificationHistoryQuery }>, reply: FastifyReply) => {
   try {
-    const { page = 1, limit = 10, type, status } = request.query;
+    const { page = 1, limit = 10, status } = request.query;
     // Admin notifications have a targetType
     const query: any = { targetType: { $exists: true } };
-    if (type) query.type = type;
     if (status) query.status = status;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -179,7 +182,6 @@ export const resendAdminNotification = async (request: FastifyRequest<{ Params: 
     const resend = await Notification.create({
       title: original.title,
       message: original.message,
-      type: original.type,
       targetType: original.targetType,
       targetUserIds: original.targetUserIds,
       targetFilter: original.targetFilter,

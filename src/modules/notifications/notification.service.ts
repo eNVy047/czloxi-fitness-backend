@@ -11,7 +11,7 @@ export class NotificationService {
   /**
    * Sends a push notification to a specific user
    */
-  static async sendPushNotification(userId: string, title: string, body: string, data?: any, category?: string) {
+  static async sendPushNotification(userId: string, title: string, body: string, data?: any) {
     try {
       const user = await User.findById(userId);
       const pushToken = user?.expoPushToken;
@@ -21,17 +21,12 @@ export class NotificationService {
         return;
       }
 
-      if (!Expo.isExpoPushToken(pushToken)) {
-        logger.error({ pushToken }, 'Invalid Expo push token');
-        return;
-      }
-
       const message: ExpoPushMessage = {
         to: pushToken,
         sound: 'default',
         title,
         body,
-        data: { ...data, categoryIdentifier: category },
+        data: { ...data },
       };
 
       const chunks = expo.chunkPushNotifications([message]);
@@ -43,12 +38,10 @@ export class NotificationService {
         }
       }
 
-      // Also save to Notification history for the user
       await Notification.create({
         userId,
         title,
         message: body,
-        type: data?.type || 'general',
         status: 'sent',
         sentAt: new Date()
       });
@@ -95,7 +88,6 @@ export class NotificationService {
         sound: 'default',
         title: notification.title,
         body: notification.message,
-        data: { type: notification.type },
       }));
 
       const chunks = expo.chunkPushNotifications(messages);
@@ -108,8 +100,6 @@ export class NotificationService {
           const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
           tickets.push(...ticketChunk);
           totalSent += chunk.length;
-          // Simplified: assume sent is delivered for now, 
-          // in production we'd check receipts later
           delivered += ticketChunk.filter(t => t.status === 'ok').length;
           failed += ticketChunk.filter(t => t.status === 'error').length;
         } catch (error) {
@@ -129,7 +119,6 @@ export class NotificationService {
         userId: u._id,
         title: notification.title,
         message: notification.message,
-        type: notification.type,
         status: 'sent',
         sentAt: new Date(),
         isRead: false
@@ -159,7 +148,6 @@ export class NotificationService {
           notification.userId.toString(),
           notification.title,
           notification.message,
-          { type: notification.type }
         );
         notification.status = 'sent';
         notification.sentAt = new Date();
@@ -195,7 +183,6 @@ export class NotificationService {
       userId,
       title: "Workout Check-in 🏋️‍♂️",
       message: "Hey! Did you get your workout in today?",
-      type: 'reminder',
       status: 'scheduled',
       scheduledAt: target
     });
@@ -230,7 +217,6 @@ export class NotificationService {
       userId,
       title: isFinal ? "Before you sleep — did you workout today? 🌙" : "Workout Check-in 🏋️‍♂️",
       message: isFinal ? "Log your workout before ending your day." : "Hey! Did you get your workout in today?",
-      type: 'reminder',
       status: 'scheduled',
       scheduledAt: target
     });

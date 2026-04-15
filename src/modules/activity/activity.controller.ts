@@ -192,4 +192,34 @@ export class ActivityController {
       throw error;
     }
   }
+
+  static async syncBatchSteps(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request.user as any).id;
+      const { steps, timestamp } = z.object({
+        steps: z.number(),
+        timestamp: z.string()
+      }).parse(request.body);
+
+      // Validation: Reject Realistic Data (Constraint 3)
+      // Example: > 5000 steps in 1 minute is unrealistic.
+      // We assume the timestamp provided is for the batch completion.
+      // A more robust check might compare with the previous record's timestamp.
+      const lastRecord = await ActivityService.getLastStepRecord(userId);
+      if (lastRecord) {
+        const lastTs = lastRecord.timestamp;
+        const diffMs = new Date(timestamp).getTime() - lastTs.getTime();
+        const diffMin = diffMs / (1000 * 60);
+        if (diffMin > 0 && steps / diffMin > 5000) {
+          return reply.status(400).send({ success: false, message: 'Unrealistic step data rejected' });
+        }
+      }
+
+      const activity = await ActivityService.syncBatchSteps(userId, steps, timestamp);
+      return sendSuccess(reply, activity, 'Batch steps synced successfully');
+    } catch (error) {
+      logger.error({ err: error, user: request.user }, 'Error POST activity/steps/sync');
+      throw error;
+    }
+  }
 }

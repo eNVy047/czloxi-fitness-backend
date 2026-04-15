@@ -20,6 +20,7 @@ import notificationRoutes from './modules/notifications/notification.routes';
 import progressRoutes from './modules/progress/progress.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import userRoutes from './modules/profile/user.routes';
+import chatRoutes from './modules/chat/chat.routes';
 import cron from 'node-cron';
 import { User } from './models/User';
 import { FoodScan } from './models/FoodScan';
@@ -68,83 +69,89 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(progressRoutes, { prefix: `${env.API_PREFIX}/progress` });
   await app.register(paymentRoutes, { prefix: `${env.API_PREFIX}/payment` });
   await app.register(userRoutes, { prefix: `${env.API_PREFIX}/user` });
+  await app.register(chatRoutes, { prefix: `${env.API_PREFIX}/chat` });
   
   // Isolated Admin Routes
   const adminRoutes = (await import('./admin/admin.routes')).default;
   await app.register(adminRoutes, { prefix: `${env.API_PREFIX}` });
 
-  // Midnight Cron: pre-create next day's DailyLog for all users with fresh goal snapshots
-  // and auto-apply daily routines/sleep schedules
+  // --- 🕛 MIDNIGHT SYSTEM MAINTENANCE ---
   cron.schedule('0 0 * * *', async () => {
-    const mongoose = (await import('mongoose')).default;
-    if (mongoose.connection.readyState !== 1) {
-      logger.warn('Skipping midnight reset: MongoDB not connected.');
-      return;
-    }
-    await DashboardService.midnightReset();
-    await ActivityService.applyDailyRoutines();
-    
     try {
+      const mongoose = (await import('mongoose')).default;
+      if (mongoose.connection.readyState !== 1) {
+        logger.warn('Skipping midnight maintenance: MongoDB not connected.');
+        return;
+      }
+
+      logger.info('🚀 Starting midnight system maintenance...');
+
+      // 1. Dashboard & Activity Resets
+      await DashboardService.midnightReset();
+      await ActivityService.applyDailyRoutines();
+
+      // 2. Load Services for background tasks
       const { NotificationService } = await import('./modules/notifications/notification.service');
       const { UserProfile } = await import('./models/UserProfile');
-      
-      // Schedule daily workout check-ins for all active users
-      const profiles = await UserProfile.find({});
-      for (const profile of profiles) {
-        await NotificationService.scheduleWorkoutCheckIn(profile.userId.toString());
-      }
-      logger.info(`Scheduled workout check-ins for ${profiles.length} users.`);
-    } catch (err) {
-      logger.error({ err }, 'Error scheduling midnight check-ins');
-    }
-  });
-
-  // Cleanup cron: delete expired 'test' FoodScans at midnight
-  cron.schedule('0 0 * * *', async () => {
-    try {
-      const mongoose = (await import('mongoose')).default;
-      if (mongoose.connection.readyState !== 1) return;
-      const result = await FoodScan.deleteMany({
-        type: 'test',
-        expiresAt: { $lte: new Date() }
-      });
-      if (result.deletedCount > 0) {
-        logger.info(`Deleted ${result.deletedCount} expired test food scans.`);
-      }
-    } catch (error) {
-      logger.error({ err: error }, 'Error deleting expired test food scans');
-    }
-  });
-
-  // Trial Expiry Cron: check for users whose trial has ended
-  cron.schedule('0 0 * * *', async () => {
-    try {
-      const mongoose = (await import('mongoose')).default;
-      if (mongoose.connection.readyState !== 1) return;
       const now = new Date();
-      const expiredUsers = await User.find({ 
+
+      // 3. Cleanup: Expired test scans
+      const foodCleanup = await FoodScan.deleteMany({
+        type: 'test',
+        expiresAt: { $lte: now }
+      });
+      if (foodCleanup.deletedCount > 0) logger.info(`Cleanup: Deleted ${foodCleanup.deletedCount} test scans.`);
+
+      // 4. Subscription & Trial Expiry + Scan Reset
+      // Reset scan counts for everyone
+      const scanReset = await User.updateMany({}, { $set: { scansToday: 0 } });
+      logger.info(`Maintenance: Reset daily scan counts for ${scanReset.matchedCount} users.`);
+
+      // Trial users
+      const expiredTrialUsers = await User.find({ 
         subscriptionStatus: 'trial', 
         trialEndsAt: { $lt: now },
         fcmToken: { $exists: true, $nin: [null, ''] }
       });
       
-      if (expiredUsers.length > 0) {
-        const { NotificationService } = await import('./modules/notifications/notification.service');
-        for (const user of expiredUsers) {
-          user.subscriptionStatus = 'expired';
-          await user.save();
-          
-          await NotificationService.sendPushNotification(
-            (user._id as any).toString(), 
-            "Trial Expired ⏳", 
-            "Your Caloxi free trial has ended. Subscribe now to keep your access to Premium features!", 
-            { type: 'promo' }
-          );
-        }
-        logger.info(`Expired ${expiredUsers.length} trials.`);
+      for (const user of expiredTrialUsers) {
+        user.subscriptionStatus = 'expired';
+        await user.save();
+        await NotificationService.sendPushNotification(
+          (user._id as any).toString(), 
+          "Trial Expired ⏳", 
+          "Your Caloxi free trial has ended. Subscribe now to keep your access!", 
+          { type: 'promo' }
+        );
       }
+
+      // Pro users
+      const expiredProUsers = await User.find({ 
+        subscriptionStatus: 'active', 
+        subscriptionEndDate: { $lt: now },
+        fcmToken: { $exists: true, $nin: [null, ''] }
+      });
+      
+      for (const user of expiredProUsers) {
+        user.subscriptionStatus = 'expired';
+        await user.save();
+        await NotificationService.sendPushNotification(
+          (user._id as any).toString(), 
+          "Subscription Expired 📉", 
+          "Your Caloxi Premium has ended. Renew now to stay on track!", 
+          { type: 'promo' }
+        );
+      }
+
+      // 5. Schedule daily workout check-ins
+      const profiles = await UserProfile.find({});
+      for (const profile of profiles) {
+        await NotificationService.scheduleWorkoutCheckIn(profile.userId.toString());
+      }
+
+      logger.info('✅ Midnight maintenance completed.');
     } catch (error) {
-      logger.error({ err: error }, 'Error expiring trials');
+      logger.error({ err: error }, 'Error during midnight maintenance');
     }
   });
 
@@ -155,7 +162,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       if (mongoose.connection.readyState !== 1) return;
       
       const { ActivityLog } = await import('./models/ActivityLog');
-      const { User } = await import('./models/User');
       const { NotificationService } = await import('./modules/notifications/notification.service');
       
       const today = new Date().toISOString().split('T')[0];
@@ -173,52 +179,16 @@ export const buildApp = async (): Promise<FastifyInstance> => {
           { type: 'activity' }
         );
       }
-      logger.info(`Sent daily burn summary to ${users.length} users.`);
     } catch (error) {
       logger.error({ err: error }, 'Error sending daily burn summary');
     }
   });
 
-  // Subscription Expiry Cron: check for users whose subscription has ended
-  cron.schedule('0 0 * * *', async () => {
-    try {
-      const mongoose = (await import('mongoose')).default;
-      if (mongoose.connection.readyState !== 1) return;
-      const now = new Date();
-      const expiredUsers = await User.find({ 
-        subscriptionStatus: 'active', 
-        subscriptionEndDate: { $lt: now },
-        fcmToken: { $exists: true, $nin: [null, ''] }
-      });
-      
-      if (expiredUsers.length > 0) {
-        const { NotificationService } = await import('./modules/notifications/notification.service');
-        for (const user of expiredUsers) {
-          user.subscriptionStatus = 'expired';
-          await user.save();
-          
-          await NotificationService.sendPushNotification(
-            (user._id as any).toString(), 
-            "Subscription Expired 📉", 
-            "Your Caloxi Premium subscription has ended. Renew now to unlock all features!", 
-            { type: 'promo' }
-          );
-        }
-        logger.info(`Expired ${expiredUsers.length} subscriptions.`);
-      }
-    } catch (error) {
-      logger.error({ err: error }, 'Error expiring subscriptions');
-    }
-  });
-
-  // Scheduled Notification Cron: check and send pending scheduled notifications every minute
+  // Scheduled Notification Cron: every minute
   cron.schedule('* * * * *', async () => {
     try {
       const mongoose = (await import('mongoose')).default;
-      if (mongoose.connection.readyState !== 1) {
-        logger.warn('Skipping scheduled notifications cron: MongoDB not connected.');
-        return;
-      }
+      if (mongoose.connection.readyState !== 1) return;
       const { NotificationService } = await import('./modules/notifications/notification.service');
       await NotificationService.sendScheduledNotifications();
     } catch (error) {

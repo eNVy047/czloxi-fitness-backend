@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { registerSchema, RegisterInput, loginSchema, LoginInput, forgotPasswordSchema, ForgotPasswordInput } from './auth.schema';
 import { AuthService } from './auth.service';
+import { User } from '../../models/User';
 import { sendCreated, sendSuccess } from '../../utils/response';
 import { logger } from '../../utils/logger';
 
@@ -29,6 +30,9 @@ export class AuthController {
         subscriptionTier: user.subscriptionTier,
         subscriptionStatus: user.subscriptionStatus,
         subscriptionEndDate: user.subscriptionEndDate,
+        trialUsed: user.trialUsed,
+        scansToday: user.scansToday,
+        trialEndsAt: user.trialEndsAt,
       };
 
       return sendCreated(reply, { user: userData, token }, 'User registered successfully');
@@ -58,6 +62,9 @@ export class AuthController {
         subscriptionTier: user.subscriptionTier,
         subscriptionStatus: user.subscriptionStatus,
         subscriptionEndDate: user.subscriptionEndDate,
+        trialUsed: user.trialUsed,
+        scansToday: user.scansToday,
+        trialEndsAt: user.trialEndsAt,
       };
 
       return reply.send({ success: true, message: 'Login successful', data: { user: userData, token } });
@@ -78,14 +85,26 @@ export class AuthController {
 
   static async verifyToken(request: FastifyRequest, reply: FastifyReply) {
     try {
-      // request.user is populated by fastify.authenticate middleware
-      const jwtUser = request.user as { 
-        id: string; 
-        email: string; 
-        subscriptionTier: string;
-        subscriptionStatus: string;
+      const jwtUser = request.user as { id: string };
+      const user = await User.findById(jwtUser.id).select('-passwordHash');
+
+      if (!user) {
+        return reply.status(401).send({ success: false, message: 'User not found' });
+      }
+
+      const userData = {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionEndDate: user.subscriptionEndDate,
+        trialUsed: user.trialUsed,
+        scansToday: user.scansToday,
+        trialEndsAt: user.trialEndsAt,
       };
-      return sendSuccess(reply, { user: jwtUser }, 'Token is valid');
+
+      return sendSuccess(reply, { user: userData }, 'Token is valid');
     } catch (error) {
       logger.error({ err: error }, 'Error in AuthController.verifyToken');
       throw error;
@@ -97,17 +116,53 @@ export class AuthController {
       const { email }: ForgotPasswordInput = forgotPasswordSchema.parse(request.body);
       
       await AuthService.forgotPassword(email);
- 
+
       return sendSuccess(reply, null, 'If your email is registered, we have sent you a temporary password.');
     } catch (error: any) {
-      // For security, don't reveal if user exists or not if we want to be more paranoid
-      // For now, if user not found, 404 is thrown by service. 
-      // We can catch it and return 200 anyway if we want total privacy.
       if (error.name === 'NotFoundError') {
         return sendSuccess(reply, null, 'If your email is registered, we have sent you a temporary password.');
       }
       
       logger.error({ err: error }, 'Error in AuthController.forgotPassword');
+      throw error;
+    }
+  }
+
+  static async startTrial(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const jwtUser = request.user as { id: string };
+      const user = await User.findById(jwtUser.id);
+
+      if (!user) {
+        return reply.status(404).send({ success: false, message: 'User not found' });
+      }
+
+      if (user.trialUsed) {
+        return reply.status(400).send({ success: false, message: 'Trial has already been used on this account.' });
+      }
+
+      // Activate 7-day trial
+      user.subscriptionStatus = 'trial';
+      user.trialUsed = true;
+      user.trialStartDate = new Date();
+      user.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await user.save();
+
+      const userData = {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionEndDate: user.subscriptionEndDate,
+        trialUsed: user.trialUsed,
+        scansToday: user.scansToday,
+        trialEndsAt: user.trialEndsAt,
+      };
+
+      return sendSuccess(reply, { user: userData }, 'Free trial activated! Enjoy your premium features for 7 days.');
+    } catch (error) {
+      logger.error({ err: error }, 'Error in AuthController.startTrial');
       throw error;
     }
   }

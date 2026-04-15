@@ -20,5 +20,8 @@ export default async function activityRoutes(fastify: FastifyInstance) {
   fastify.delete('/routine/:id', ActivityController.deleteRoutine);
   // Daily Checkin
   fastify.patch('/workout-checkin', ActivityController.workoutCheckin);
+
+  // New Step Tracking Routes
+  fastify.post('/steps/sync', ActivityController.syncBatchSteps);
 }
 

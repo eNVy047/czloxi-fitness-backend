@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FoodScan } from '../../models/FoodScan';
+import { User } from '../../models/User';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { sendSuccess } from '../../utils/response';
 import { logger } from '../../utils/logger';
@@ -16,6 +17,37 @@ export class FoodScanController {
       const { imageBase64 } = request.body;
       if (!imageBase64) {
         return reply.status(400).send({ success: false, message: 'No image provided' });
+      }
+
+      const userId = (request.user as any).id;
+      const user = await User.findById(userId);
+
+      if (!user) {
+        return reply.status(404).send({ success: false, message: 'User not found' });
+      }
+
+      // --- 🟢 SUBSCRIPTION & LIMIT LOGIC ---
+      const today = new Date().toISOString().split('T')[0];
+      
+      // 1. Daily Reset (Security Check)
+      if (user.lastScanDate !== today) {
+        user.scansToday = 0;
+        user.lastScanDate = today;
+      }
+
+      // 2. Determine Tier & Limit
+      const isTrialActive = user.subscriptionStatus === 'trial' && user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+      const hasProAccess = user.subscriptionTier === 'pro' || isTrialActive;
+      const scanLimit = hasProAccess ? 15 : 1;
+
+      // 3. Enforce Limit
+      if (user.scansToday >= scanLimit) {
+        return reply.status(403).send({ 
+          success: false, 
+          message: 'Daily scan limit reached',
+          limit: scanLimit,
+          isPro: hasProAccess
+        });
       }
 
       // Initialize the Gemini model for vision
@@ -67,8 +99,8 @@ export class FoodScanController {
 
       if (!result) throw lastError;
 
-      const response = await result.response;
-      let text = response.text().trim();
+      const gResponse = await result.response;
+      let text = gResponse.text().trim();
 
       // Attempt to clean text if Gemini returned markdown formatting anyway
       if (text.startsWith('```json')) {
@@ -78,6 +110,11 @@ export class FoodScanController {
       }
 
       const nutritionalData = JSON.parse(text);
+
+      // 4. Update scan count & last scan date
+      user.scansToday += 1;
+      user.lastScanDate = today;
+      await user.save();
 
       return sendSuccess(reply, { data: nutritionalData }, 'Food analyzed successfully');
     } catch (error) {
