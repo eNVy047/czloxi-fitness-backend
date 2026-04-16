@@ -123,7 +123,7 @@ export class PaymentController {
       const user = await User.findById(userId).select('subscriptionStatus subscriptionEndDate trialEndsAt');
 
       if (!user) {
-        return sendError(reply, 404, 'User not found');
+        return sendError(reply, 401, 'User session invalid - user not found. Please log in again.');
       }
 
       return sendSuccess(reply, {
@@ -154,7 +154,7 @@ export class PaymentController {
       const user = await User.findById(userId);
 
       if (!user) {
-        return sendError(reply, 404, 'User not found');
+        return sendError(reply, 401, 'User session invalid - user not found. Please log in again.');
       }
 
       if (user.subscriptionStatus !== 'none' || user.trialUsed) {

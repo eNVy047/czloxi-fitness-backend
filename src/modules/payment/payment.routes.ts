@@ -9,5 +9,4 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
   fastify.post('/verify', PaymentController.verifyPayment);
   fastify.get('/status', PaymentController.getStatus);
   fastify.get('/history', PaymentController.getHistory);
-  fastify.post('/start-trial', PaymentController.startTrial);
 }

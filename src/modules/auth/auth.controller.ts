@@ -89,7 +89,7 @@ export class AuthController {
       const user = await User.findById(jwtUser.id).select('-passwordHash');
 
       if (!user) {
-        return reply.status(401).send({ success: false, message: 'User not found' });
+        return reply.status(401).send({ success: false, message: 'User session invalid - user not found. Please log in again.' });
       }
 
       const userData = {
@@ -134,7 +134,7 @@ export class AuthController {
       const user = await User.findById(jwtUser.id);
 
       if (!user) {
-        return reply.status(404).send({ success: false, message: 'User not found' });
+        return reply.status(401).send({ success: false, message: 'User session invalid - user not found. Please log in again.' });
       }
 
       if (user.trialUsed) {
