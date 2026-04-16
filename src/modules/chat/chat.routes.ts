@@ -3,7 +3,7 @@ import { ChatController } from './chat.controller';
 import { subscriptionGuard } from '../payment/subscriptionGuard';
 
 export default async function chatRoutes(fastify: FastifyInstance) {
-  fastify.post('/', {
+  fastify.post('', {
     preHandler: [fastify.authenticate, subscriptionGuard],
     schema: {
       body: {
