@@ -26,30 +26,6 @@ export class FoodScanController {
         return reply.status(404).send({ success: false, message: 'User not found' });
       }
 
-      // --- 🟢 SUBSCRIPTION & LIMIT LOGIC ---
-      const today = new Date().toISOString().split('T')[0];
-      
-      // 1. Daily Reset (Security Check)
-      if (user.lastScanDate !== today) {
-        user.scansToday = 0;
-        user.lastScanDate = today;
-      }
-
-      // 2. Determine Tier & Limit
-      const isTrialActive = user.subscriptionStatus === 'trial' && user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
-      const hasProAccess = user.subscriptionTier === 'pro' || isTrialActive;
-      const scanLimit = hasProAccess ? 15 : 1;
-
-      // 3. Enforce Limit
-      if (user.scansToday >= scanLimit) {
-        return reply.status(403).send({ 
-          success: false, 
-          message: 'Daily scan limit reached',
-          limit: scanLimit,
-          isPro: hasProAccess
-        });
-      }
-
       // Initialize the Gemini model for vision
       const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
@@ -102,7 +78,6 @@ export class FoodScanController {
       const gResponse = await result.response;
       let text = gResponse.text().trim();
 
-      // Attempt to clean text if Gemini returned markdown formatting anyway
       if (text.startsWith('```json')) {
         text = text.replace(/^```json/, '').replace(/```$/, '').trim();
       } else if (text.startsWith('```')) {
@@ -111,10 +86,19 @@ export class FoodScanController {
 
       const nutritionalData = JSON.parse(text);
 
-      // 4. Update scan count & last scan date
-      user.scansToday += 1;
-      user.lastScanDate = today;
+      // 1. Update scan count in user model
+      user.foodScansToday += 1;
       await user.save();
+
+      // 2. Increment scan count in DailyLog for historical tracking
+      const today = new Date().toISOString().split('T')[0];
+      await DashboardService.getOrCreateTodayLog(userId); // ensure it exists
+      const { DailyLog } = await import('../../models/DailyLog');
+      await DailyLog.findOneAndUpdate(
+        { userId, date: today },
+        { $inc: { foodScansCount: 1 } },
+        { upsert: true }
+      );
 
       return sendSuccess(reply, { data: nutritionalData }, 'Food analyzed successfully');
     } catch (error) {

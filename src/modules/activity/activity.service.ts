@@ -218,23 +218,37 @@ export class ActivityService {
   static async logSleep(userId: string, date: string, data: {
     bedtime: string;
     wakeTime: string;
-    sleepHours: number;
-    sleepQuality?: '😴' | '😐' | '😊';
-    isDaily?: boolean;
+    sleepHours?: number | undefined;
+    sleepQuality?: '😴' | '😐' | '😊' | undefined;
+    isDaily?: boolean | undefined;
   }): Promise<IActivityLog> {
+    // 1. Calculate Sleep Hours if not provided or to ensure accuracy
+    let sleepHours = data.sleepHours;
+    if (data.bedtime && data.wakeTime) {
+      const [bH, bM] = data.bedtime.split(':').map(Number);
+      const [wH, wM] = data.wakeTime.split(':').map(Number);
+      let diff = wH - bH + (wM - bM) / 60;
+      if (diff < 0) diff += 24;
+      sleepHours = parseFloat(diff.toFixed(1));
+    }
+
+    if (!sleepHours) sleepHours = 0;
+
+    // 2. Update ActivityLog (Today's detailed log)
     const log = await ActivityLog.findOneAndUpdate(
       { userId, date },
       {
         $set: {
           bedtime: data.bedtime,
           wakeTime: data.wakeTime,
-          sleepHours: data.sleepHours,
+          sleepHours,
           sleepQuality: data.sleepQuality,
         }
       },
       { new: true, upsert: true }
     );
 
+    // 3. Update master SleepSchedule if marked as Daily
     if (data.isDaily) {
       await SleepSchedule.findOneAndUpdate(
         { userId },
@@ -249,10 +263,17 @@ export class ActivityService {
       );
     }
 
-    // Sync sleep hours to daily log as well
+    // 4. Update DailyLog with sleep data and duration
     await DailyLog.findOneAndUpdate(
       { userId, date },
-      { $set: { sleepHours: data.sleepHours } },
+      {
+        $set: {
+          sleepHours,
+          bedtime: data.bedtime,
+          wakeTime: data.wakeTime,
+          sleepScore: Math.min(Math.round((sleepHours / 8) * 100), 100)
+        }
+      },
       { upsert: true }
     );
 

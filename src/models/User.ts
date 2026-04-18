@@ -21,11 +21,13 @@ export interface IUser extends Document {
   planType?: 'monthly' | 'yearly';
   paymentId?: string;
   trialUsed: boolean;
-  scansToday: number;
-  lastScanDate?: string;
   expoPushToken?: string;
   fcmToken?: string;
   lastActiveAt?: Date;
+  trialStarted: boolean;
+  deviceFingerprint?: string;
+  foodScansToday: number;
+  foodScansResetDate?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -60,11 +62,13 @@ const userSchema = new Schema<IUser>(
     planType: { type: String, enum: ['monthly', 'yearly'] },
     paymentId: { type: String },
     trialUsed: { type: Boolean, default: false },
-    scansToday: { type: Number, default: 0 },
-    lastScanDate: { type: String },
     expoPushToken: { type: String },
     fcmToken: { type: String, index: true },
     lastActiveAt: { type: Date, default: Date.now },
+    trialStarted: { type: Boolean, default: false },
+    deviceFingerprint: { type: String, index: true },
+    foodScansToday: { type: Number, default: 0 },
+    foodScansResetDate: { type: Date, default: Date.now },
   },
   {
     timestamps: true,

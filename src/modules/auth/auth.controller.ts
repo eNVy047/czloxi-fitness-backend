@@ -31,7 +31,7 @@ export class AuthController {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionEndDate: user.subscriptionEndDate,
         trialUsed: user.trialUsed,
-        scansToday: user.scansToday,
+        foodScansToday: user.foodScansToday,
         trialEndsAt: user.trialEndsAt,
       };
 
@@ -63,7 +63,7 @@ export class AuthController {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionEndDate: user.subscriptionEndDate,
         trialUsed: user.trialUsed,
-        scansToday: user.scansToday,
+        foodScansToday: user.foodScansToday,
         trialEndsAt: user.trialEndsAt,
       };
 
@@ -100,7 +100,7 @@ export class AuthController {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionEndDate: user.subscriptionEndDate,
         trialUsed: user.trialUsed,
-        scansToday: user.scansToday,
+        foodScansToday: user.foodScansToday,
         trialEndsAt: user.trialEndsAt,
       };
 
@@ -128,42 +128,5 @@ export class AuthController {
     }
   }
 
-  static async startTrial(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const jwtUser = request.user as { id: string };
-      const user = await User.findById(jwtUser.id);
 
-      if (!user) {
-        return reply.status(401).send({ success: false, message: 'User session invalid - user not found. Please log in again.' });
-      }
-
-      if (user.trialUsed) {
-        return reply.status(400).send({ success: false, message: 'Trial has already been used on this account.' });
-      }
-
-      // Activate 7-day trial
-      user.subscriptionStatus = 'trial';
-      user.trialUsed = true;
-      user.trialStartDate = new Date();
-      user.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await user.save();
-
-      const userData = {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        subscriptionTier: user.subscriptionTier,
-        subscriptionStatus: user.subscriptionStatus,
-        subscriptionEndDate: user.subscriptionEndDate,
-        trialUsed: user.trialUsed,
-        scansToday: user.scansToday,
-        trialEndsAt: user.trialEndsAt,
-      };
-
-      return sendSuccess(reply, { user: userData }, 'Free trial activated! Enjoy your premium features for 7 days.');
-    } catch (error) {
-      logger.error({ err: error }, 'Error in AuthController.startTrial');
-      throw error;
-    }
-  }
 }

@@ -13,20 +13,13 @@ export const subscriptionGuard = async (request: FastifyRequest, reply: FastifyR
   const now = new Date();
   const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
-  // 1. Reset daily scans if date changed
-  if (user.lastScanDate !== today) {
-    user.scansToday = 0;
-    user.lastScanDate = today;
-    await user.save();
-  }
-
   const isTrialActive = user.subscriptionStatus === 'trial' && user.trialEndsAt && user.trialEndsAt > now;
   const isSubscribed = user.subscriptionStatus === 'active' && user.subscriptionEndDate && user.subscriptionEndDate > now;
   const hasProAccess = isTrialActive || isSubscribed;
 
   const url = request.url;
 
-  // 2. Chat Access Control
+  // 1. Chat Access Control
   if (url.includes('/api/v1/chat')) {
     if (!hasProAccess) {
       return reply.status(403).send({ 
@@ -37,11 +30,11 @@ export const subscriptionGuard = async (request: FastifyRequest, reply: FastifyR
     }
   }
 
-  // 3. Scan Limit Protection
+  // 2. Scan Limit Protection
   if (url.includes('/api/v1/food/analyze')) {
     const limit = hasProAccess ? 15 : 1;
 
-    if (user.scansToday >= limit) {
+    if (user.foodScansToday >= limit) {
       return reply.status(429).send({ 
         error: 'Too Many Requests', 
         message: hasProAccess 

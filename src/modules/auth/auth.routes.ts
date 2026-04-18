@@ -7,5 +7,4 @@ export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/logout', { preValidation: [fastify.authenticate] }, AuthController.logout);
   fastify.get('/verify', { preValidation: [fastify.authenticate] }, AuthController.verifyToken);
   fastify.post('/forgot-password', AuthController.forgotPassword);
-  fastify.post('/start-trial', { preValidation: [fastify.authenticate] }, AuthController.startTrial);
 }

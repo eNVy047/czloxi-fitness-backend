@@ -21,6 +21,7 @@ import progressRoutes from './modules/progress/progress.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import userRoutes from './modules/profile/user.routes';
 import chatRoutes from './modules/chat/chat.routes';
+import subscriptionRoutes from './modules/subscription/subscription.routes';
 import cron from 'node-cron';
 import { User } from './models/User';
 import { FoodScan } from './models/FoodScan';
@@ -74,6 +75,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(paymentRoutes, { prefix: `${env.API_PREFIX}/payment` });
   await app.register(userRoutes, { prefix: `${env.API_PREFIX}/user` });
   await app.register(chatRoutes, { prefix: `${env.API_PREFIX}/chat` });
+  await app.register(subscriptionRoutes, { prefix: `${env.API_PREFIX}/subscription` });
   
   // Isolated Admin Routes
   const adminRoutes = (await import('./admin/admin.routes')).default;
@@ -107,9 +109,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
       if (foodCleanup.deletedCount > 0) logger.info(`Cleanup: Deleted ${foodCleanup.deletedCount} test scans.`);
 
       // 4. Subscription & Trial Expiry + Scan Reset
-      // Reset scan counts for everyone
-      const scanReset = await User.updateMany({}, { $set: { scansToday: 0 } });
-      logger.info(`Maintenance: Reset daily scan counts for ${scanReset.matchedCount} users.`);
+      const scanReset = await User.updateMany({}, { $set: { foodScansToday: 0 } });
+      logger.info(`Maintenance: Reset daily food scans for ${scanReset.matchedCount} users.`);
 
       // Trial users
       const expiredTrialUsers = await User.find({ 

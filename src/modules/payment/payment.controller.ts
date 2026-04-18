@@ -42,16 +42,6 @@ export class PaymentController {
 
       const order = await razorpay.orders.create(options);
 
-      // Create pending payment record
-      await Payment.create({
-        userId,
-        razorpayOrderId: order.id,
-        receipt: options.receipt,
-        amount: amount / 100,
-        currency,
-        status: 'pending',
-      });
-
       return sendCreated(reply, {
         orderId: order.id,
         amount: order.amount,
@@ -80,20 +70,22 @@ export class PaymentController {
         .digest('hex');
 
       if (generated_signature !== razorpay_signature) {
-        // Update payment status to failed
-        await Payment.findOneAndUpdate(
-          { razorpayOrderId: razorpay_order_id },
-          { status: 'failed', razorpayPaymentId: razorpay_payment_id }
-        );
         return sendError(reply, 400, 'Invalid payment signature');
       }
 
-      // Update payment record
-      const payment = await Payment.findOneAndUpdate(
-        { razorpayOrderId: razorpay_order_id },
-        { status: 'success', razorpayPaymentId: razorpay_payment_id },
-        { new: true }
-      );
+      // Fetch order details from Razorpay to get amount and receipt
+      const order = await razorpay.orders.fetch(razorpay_order_id);
+
+      // Create success payment record only now
+      const payment = await Payment.create({
+        userId,
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        receipt: order.receipt,
+        amount: Number(order.amount) / 100,
+        currency: order.currency,
+        status: 'success',
+      });
 
       // Update user subscription
       const now = new Date();

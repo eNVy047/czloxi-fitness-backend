@@ -33,6 +33,7 @@ export interface IDailyLog extends Document {
   mood?: 'happy' | 'neutral' | 'sad' | 'angry' | 'tired';
   exerciseLogged: boolean;
   goalMet: boolean;
+  foodScansCount: number;
   goalsMeta: IGoalsMeta;
   createdAt: Date;
   updatedAt: Date;
@@ -75,6 +76,7 @@ const dailyLogSchema = new Schema<IDailyLog>(
     },
     exerciseLogged: { type: Boolean, default: false },
     goalMet: { type: Boolean, default: false },
+    foodScansCount: { type: Number, default: 0 },
     goalsMeta: { type: goalMetaSchema, default: () => ({}) },
   },
   {

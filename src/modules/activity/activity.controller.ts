@@ -106,7 +106,7 @@ export class ActivityController {
         date: z.string(),
         bedtime: z.string(),
         wakeTime: z.string(),
-        sleepHours: z.number(),
+        sleepHours: z.number().optional(),
         sleepQuality: z.enum(['😴', '😐', '😊']).optional(),
         isDaily: z.boolean().optional(),
       }).parse(request.body);
