@@ -54,9 +54,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(rateLimitPlugin);
   await app.register(activityPlugin);
 
-  // Healthcheck
   app.get('/health', async () => {
     return { status: 'ok', uptime: process.uptime() };
+  });
+
+  // Diagnostic Routes (Temporary)
+  app.get(`${env.API_PREFIX}/debug-routes`, async () => {
+    return { routes: app.printRoutes() };
   });
 
   // Mount API Routes
