@@ -6,7 +6,6 @@ import { SleepSchedule } from '../../models/SleepSchedule';
 import { UserProfile } from '../../models/UserProfile';
 import { NotificationService } from '../notifications/notification.service';
 import { StepRecord } from '../../models/StepRecord';
-import { startOfDay, endOfDay, format } from 'date-fns';
 import { logger } from '../../utils/logger';
 
 export class ActivityService {

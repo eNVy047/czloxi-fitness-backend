@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { geminiFlash, genAI } from '../../config/gemini';
+import { geminiFlash } from '../../config/gemini';
 import { User } from '../../models/User';
 import { sendSuccess } from '../../utils/response';
 import { logger } from '../../utils/logger';
