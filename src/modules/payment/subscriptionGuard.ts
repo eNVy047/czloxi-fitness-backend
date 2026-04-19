@@ -14,7 +14,9 @@ export const subscriptionGuard = async (request: FastifyRequest, reply: FastifyR
 
   const isTrialActive = user.subscriptionStatus === 'trial' && user.trialEndsAt && user.trialEndsAt > now;
   const isSubscribed = user.subscriptionStatus === 'active' && user.subscriptionEndDate && user.subscriptionEndDate > now;
-  const hasProAccess = isTrialActive || isSubscribed;
+  const isProTier = user.subscriptionTier === 'pro';
+
+  const hasProAccess = isProTier || isTrialActive || isSubscribed;
 
   const url = request.url;
 
