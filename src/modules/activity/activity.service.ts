@@ -242,6 +242,7 @@ export class ActivityService {
           bedtime: data.bedtime,
           wakeTime: data.wakeTime,
           sleepHours,
+          sleepScore: Math.min(Math.round((sleepHours / 8) * 100), 100),
           sleepQuality: data.sleepQuality,
         }
       },
