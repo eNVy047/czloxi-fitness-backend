@@ -15,7 +15,7 @@ export class NotificationService {
     try {
       const user = await User.findById(userId);
       const pushToken = user?.expoPushToken;
-      
+
       if (!pushToken) {
         logger.info({ userId }, 'No push token found for user, skipping notification');
         return;
@@ -168,7 +168,7 @@ export class NotificationService {
       await this.sendWorkoutCheckIn(userId);
       return;
     }
-    
+
     // Clear any existing scheduled check-ins to prevent duplicates
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
@@ -212,7 +212,7 @@ export class NotificationService {
       isFinal ? await this.sendFinalWorkoutCheckIn(userId) : await this.sendWorkoutCheckIn(userId);
       return;
     }
-    
+
     await Notification.create({
       userId,
       title: isFinal ? "Before you sleep — did you workout today? 🌙" : "Workout Check-in 🏋️‍♂️",
@@ -236,5 +236,40 @@ export class NotificationService {
       default: target.setHours(18, 0, 0, 0); break;
     }
     return target;
+  }
+
+  /**
+   * Sends a persuasive subscription reminder to a specific user
+   */
+  static async sendSubscriptionReminder(userId: string) {
+    const title = "Upgrade to Caloxi Pro! 🚀";
+    const body = "Your 7-day trial has ended. Subscribe now to unlock unlimited AI Chat coaching and 15 scans per day!";
+    await this.sendPushNotification(userId, title, body, { type: 'subscription_reminder' });
+  }
+
+  /**
+   * Batch sends subscription reminders to all users who have finished their trial
+   */
+  static async sendSubscriptionRemindersToAllExpired() {
+    logger.info('🚀 Starting batch subscription reminders...');
+    try {
+      const now = new Date();
+      // Target users who are on 'free' tier and trial is past
+      const expiredUsers = await User.find({
+        subscriptionTier: 'free',
+        trialEndsAt: { $lt: now },
+        expoPushToken: { $exists: true, $ne: '' }
+      });
+
+      logger.info({ count: expiredUsers.length }, '🎯 Found expired users for reminders');
+
+      for (const user of expiredUsers) {
+        await this.sendSubscriptionReminder(user._id.toString());
+      }
+
+      logger.info('✅ Batch subscription reminders completed');
+    } catch (error) {
+      logger.error({ err: error }, '❌ Error in sendSubscriptionRemindersToAllExpired');
+    }
   }
 }

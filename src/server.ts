@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { logger } from './utils/logger';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { disconnectRedis } from './config/redis';
+import { SchedulerService } from './services/scheduler.service';
 
 async function startServer() {
   try {
@@ -17,7 +18,10 @@ async function startServer() {
     await app.listen({ port: env.PORT, host: env.HOST });
     logger.info(`🚀 Server running on http://${env.HOST}:${env.PORT}`);
 
-    // 4. Graceful Shutdown handlers
+    // 4. Initialize Scheduler (Cron Jobs)
+    SchedulerService.init();
+
+    // 5. Graceful Shutdown handlers
     const signals = ['SIGINT', 'SIGTERM'];
     for (const signal of signals) {
       process.on(signal, async () => {
