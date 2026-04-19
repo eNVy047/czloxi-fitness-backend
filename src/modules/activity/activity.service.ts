@@ -38,6 +38,12 @@ export class ActivityService {
     const today = new Date().toISOString().split('T')[0];
     const targetDate = date || today;
 
+    // Regression Guard: Fetch existing log first to prevent overwriting with stale data
+    const existingLog = await ActivityLog.findOne({ userId, date: targetDate });
+    if (existingLog && steps <= existingLog.steps) {
+      return existingLog;
+    }
+
     // Calculate new values
     const stepCalories = Math.round(steps * 0.04);
     const distance = parseFloat((steps * 0.0008).toFixed(2)); // km
@@ -51,6 +57,7 @@ export class ActivityService {
     const syncedLog = await this.syncToDailyLog(userId, targetDate);
     return syncedLog || log;
   }
+
 
   static async logExercise(userId: string, exerciseData: {
     exerciseName: string;
