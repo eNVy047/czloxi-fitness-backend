@@ -1,6 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { User } from '../../models/User';
-import { DailyLog } from '../../models/DailyLog';
 import { logger } from '../../utils/logger';
 import { sendSuccess, sendError } from '../../utils/response';
 import { z } from 'zod';

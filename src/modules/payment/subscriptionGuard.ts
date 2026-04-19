@@ -11,7 +11,6 @@ export const subscriptionGuard = async (request: FastifyRequest, reply: FastifyR
   }
 
   const now = new Date();
-  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
   const isTrialActive = user.subscriptionStatus === 'trial' && user.trialEndsAt && user.trialEndsAt > now;
   const isSubscribed = user.subscriptionStatus === 'active' && user.subscriptionEndDate && user.subscriptionEndDate > now;
